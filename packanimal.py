@@ -150,6 +150,8 @@ def main():
     parser.add_argument('--obool', required=False, help='Oracle bool value to search for')
     parser.add_argument('--ofloat', required=False, help='Oracle float value to search for')
     parser.add_argument('--obytes', required=False, help='Oracle bytes value to search for')
+    parser.add_argument('--oencoding', required=False, type=str, help='Byte encoding of Oracle for --obytes EX: "ascii", "utf8"')
+
 
     args = parser.parse_args()
     #Get packet data
@@ -178,20 +180,23 @@ def main():
     
     #Handle --obytes
     if(args.obytes is not None):
-        ctypes = python2CTypes['bytes']
-        #Try each ctype for python type int
-        for ctype in ctypes:
-            #Try each rolling window
-            for window in bytesWindows(packetBytes):
-                #print(window)
-                window2CType = unpackCtypeBytes(window, ctype['pythonFormat'])
-                if(window2CType != None):
-                    #print(window2CType)
-                    if(bytes(args.obytes, encoding='ascii') in window2CType):
-                        print('FOUND OINT ORACLE: ' + str(args.obytes))
-                        print(ctype)
-                        print(window)
-                        print(window2CType)
+        if(args.oencoding is not None):
+            ctypes = python2CTypes['bytes']
+            #Try each ctype for python type int
+            for ctype in ctypes:
+                #Try each rolling window
+                for window in bytesWindows(packetBytes):
+                    #print(window)
+                    window2CType = unpackCtypeBytes(window, ctype['pythonFormat'])
+                    if(window2CType != None):
+                        #print(window2CType)
+                        if(bytes(args.obytes, encoding=args.oencoding) in window2CType):
+                            print('FOUND OBYTES ORACLE: ' + str(args.obytes))
+                            print(ctype)
+                            print(window)
+                            print(window2CType)
+        else:
+            print("WARN: --obytes must be paired with --oencoding")
     
 
 
