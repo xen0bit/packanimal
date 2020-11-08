@@ -57,6 +57,21 @@ python2CTypes = {
             "length" : 8,
             "pythonFormat" : "q"
         }
+    ],
+    "bool" : [
+        {
+            "ctype" : "_Bool",
+            "length" : 1,
+            "pythonFormat" : "?"
+        }
+    ],
+    "bytes" : [
+        {
+            "ctype" : "char[]",
+            #This attribute is ignored as char[] is variable length
+            "length" : "variable",
+            "pythonFormat" : "s"
+        }
     ]
 }
 
@@ -65,7 +80,7 @@ def getBin(fileName):
         packet = f.read()
         return packet
 
-def windows(structLength, packetBytes):
+def integerWindows(structLength, packetBytes):
     #Collector
     output = []
     packetLength = len(packetBytes)
@@ -87,7 +102,24 @@ def windows(structLength, packetBytes):
     #Drop any windows that don't match the strcutLength
     return filter(dropTooShort, output)
 
-def unpackCtype(window, formatString):
+def bytesWindows(packetBytes):
+    #Collector
+    output = []
+    packetLength = len(packetBytes)
+
+    #Rolls a windows through bytearray and accumulates chunks
+    for chunkLength in range(packetLength):
+        for window in range(packetLength):
+            #print(packetBytes[window:(window+chunkLength)])
+            try:
+                temp = packetBytes[window:(window+chunkLength)]
+                output.append(temp)
+            except:
+                None
+
+    return output
+
+def unpackCtypeInteger(window, formatString):
     output = None
     try:
         # ! is network (Big Endian)
@@ -96,13 +128,24 @@ def unpackCtype(window, formatString):
         None
     return output 
 
+def unpackCtypeBytes(window, formatString):
+    output = None
+    try:
+        # ! is network (Big Endian)
+        output = struct.unpack('!' + str(len(window)) + formatString, bytes(window))
+    except:
+        None
+    return output 
+
+
+
 
 
 def main():
     #Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--bf', required=True, help='Binary file containing a single packet layer')
-    parser.add_argument('--obyte', required=False, help='Oracle integer value to search for')
+    parser.add_argument('--obyte', required=False, type=str, help='Oracle integer value to search for')
     parser.add_argument('--oint', required=False, type=int, help='Oracle integer value to search for')
     parser.add_argument('--obool', required=False, help='Oracle bool value to search for')
     parser.add_argument('--ofloat', required=False, help='Oracle float value to search for')
@@ -117,18 +160,35 @@ def main():
     #packetBytes = bytearray(b'\x00\x01\x00\x02\x00\x03')
     
     #Handle --oint
-    if(args.oint != None):
+    if(args.oint is not None):
         ctypes = python2CTypes['integer']
         #Try each ctype for python type int
         for ctype in ctypes:
             #Try each rolling window
-            for window in windows(ctype['length'], packetBytes):
+            for window in integerWindows(ctype['length'], packetBytes):
                 #print(window)
-                window2CType = unpackCtype(window, ctype['pythonFormat'])
+                window2CType = unpackCtypeInteger(window, ctype['pythonFormat'])
                 if(window2CType != None):
                     #print(window2CType)
                     if(args.oint in window2CType):
                         print('FOUND OINT ORACLE: ' + str(args.oint))
+                        print(ctype)
+                        print(window)
+                        print(window2CType)
+    
+    #Handle --obytes
+    if(args.obytes is not None):
+        ctypes = python2CTypes['bytes']
+        #Try each ctype for python type int
+        for ctype in ctypes:
+            #Try each rolling window
+            for window in bytesWindows(packetBytes):
+                #print(window)
+                window2CType = unpackCtypeBytes(window, ctype['pythonFormat'])
+                if(window2CType != None):
+                    #print(window2CType)
+                    if(bytes(args.obytes, encoding='ascii') in window2CType):
+                        print('FOUND OINT ORACLE: ' + str(args.obytes))
                         print(ctype)
                         print(window)
                         print(window2CType)
