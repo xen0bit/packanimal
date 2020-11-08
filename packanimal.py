@@ -1,5 +1,6 @@
 import argparse
 import struct
+from tqdm import tqdm
 
 #Reverse Python types to CTypes table
 python2CTypes = {
@@ -12,9 +13,49 @@ python2CTypes = {
     ],
     "integer" : [
         {
+            "ctype" : "signed char",
+            "length" : 1,
+            "pythonFormat" : "b"
+        },
+        {
+            "ctype" : "unsigned char",
+            "length" : 1,
+            "pythonFormat" : "B"
+        },
+        {
+            "ctype" : "short",
+            "length" : 2,
+            "pythonFormat" : "h"
+        },
+        {
             "ctype" : "unsigned short",
             "length" : 2,
             "pythonFormat" : "H"
+        },
+        {
+            "ctype" : "int",
+            "length" : 4,
+            "pythonFormat" : "i"
+        },
+        {
+            "ctype" : "unsigned int",
+            "length" : 4,
+            "pythonFormat" : "I"
+        },
+        {
+            "ctype" : "long",
+            "length" : 4,
+            "pythonFormat" : "l"
+        },
+        {
+            "ctype" : "unsigned long",
+            "length" : 4,
+            "pythonFormat" : "L"
+        },
+        {
+            "ctype" : "long long",
+            "length" : 8,
+            "pythonFormat" : "q"
         }
     ]
 }
@@ -80,7 +121,6 @@ def main():
         ctypes = python2CTypes['integer']
         #Try each ctype for python type int
         for ctype in ctypes:
-            print(ctype)
             #Try each rolling window
             for window in windows(ctype['length'], packetBytes):
                 #print(window)
@@ -89,6 +129,7 @@ def main():
                     #print(window2CType)
                     if(args.oint in window2CType):
                         print('FOUND OINT ORACLE: ' + str(args.oint))
+                        print(ctype)
                         print(window)
                         print(window2CType)
     
