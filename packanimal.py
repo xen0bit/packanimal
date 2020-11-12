@@ -1,5 +1,6 @@
 import argparse
 import struct
+import colordiff
 from tqdm import tqdm
 
 #Reverse Python types to CTypes table
@@ -88,13 +89,16 @@ def integerWindows(structLength, packetBytes):
     #Rolls a windows through bytearray and accumulates chunks
     for window in range(packetLength):
         try:
-            temp = packetBytes[window:(window+structLength)]
+            temp = {}
+            temp['bytes'] = packetBytes[window:(window+structLength)]
+            temp['start'] = window
+            temp['end'] = window+structLength
             output.append(temp)
         except:
             None
     #Filter function
     def dropTooShort(window):
-        if (len(window) == structLength):
+        if (len(window['bytes']) == structLength):
             return True
         else:
             return False
@@ -110,9 +114,12 @@ def bytesWindows(packetBytes):
     #Rolls a windows through bytearray and accumulates chunks
     for chunkLength in range(packetLength):
         for window in range(packetLength):
+            temp = {}
             #print(packetBytes[window:(window+chunkLength)])
             try:
-                temp = packetBytes[window:(window+chunkLength)]
+                temp['bytes'] = packetBytes[window:(window+chunkLength)]
+                temp['start'] = window
+                temp['end'] = window+chunkLength
                 output.append(temp)
             except:
                 None
@@ -169,14 +176,23 @@ def main():
             #Try each rolling window
             for window in integerWindows(ctype['length'], packetBytes):
                 #print(window)
-                window2CType = unpackCtypeInteger(window, ctype['pythonFormat'])
+                window2CType = unpackCtypeInteger(window['bytes'], ctype['pythonFormat'])
                 if(window2CType != None):
                     #print(window2CType)
                     if(args.oint in window2CType):
                         print('FOUND OINT ORACLE: ' + str(args.oint))
+                        print('CTYPE:')
                         print(ctype)
+                        print('WINDOW:')
                         print(window)
-                        print(window2CType)
+                        print('UNPACKED VALUE:')
+                        print(window2CType[0])
+
+                        startUnpacked = str(bytes(packetBytes[:window['start']]))[2:-1]
+                        midUnpacked = str(window2CType[0])
+                        endUnpacked = str(bytes(packetBytes[window['end']:]))[2:-1]
+                        unpacked = startUnpacked + midUnpacked + endUnpacked
+                        colordiff.packetdiff(str(packet)[2:-1], unpacked)
     
     #Handle --obytes
     if(args.obytes is not None):
@@ -187,14 +203,23 @@ def main():
                 #Try each rolling window
                 for window in bytesWindows(packetBytes):
                     #print(window)
-                    window2CType = unpackCtypeBytes(window, ctype['pythonFormat'])
+                    window2CType = unpackCtypeBytes(window['bytes'], ctype['pythonFormat'])
                     if(window2CType != None):
                         #print(window2CType)
                         if(bytes(args.obytes, encoding=args.oencoding) in window2CType):
                             print('FOUND OBYTES ORACLE: ' + str(args.obytes))
+                            print('CTYPE:')
                             print(ctype)
+                            print('WINDOW:')
                             print(window)
-                            print(window2CType)
+                            print('UNPACKED VALUE:')
+                            print(window2CType[0])
+
+                            startUnpacked = str(bytes(packetBytes[:window['start']]))[2:-1]
+                            midUnpacked = str(window2CType[0])
+                            endUnpacked = str(bytes(packetBytes[window['end']:]))[2:-1]
+                            unpacked = startUnpacked + midUnpacked + endUnpacked
+                            colordiff.packetdiff(str(packet)[2:-1], unpacked)
         else:
             print("WARN: --obytes must be paired with --oencoding")
     
