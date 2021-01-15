@@ -2,6 +2,13 @@ import argparse
 import struct
 import colordiff
 from tqdm import tqdm
+try:
+    from colorama import Fore, Back, Style, init
+    init()
+except ImportError:  # fallback so that the imported classes always exist
+    class ColorFallback():
+        __getattr__ = lambda self, name: ''
+    Fore = Back = Style = ColorFallback()
 
 #Reverse Python types to CTypes table
 python2CTypes = {
@@ -87,15 +94,18 @@ def integerWindows(structLength, packetBytes):
     packetLength = len(packetBytes)
 
     #Rolls a windows through bytearray and accumulates chunks
+    id = 0
     for window in range(packetLength):
         try:
             temp = {}
+            temp['id'] = id
             temp['bytes'] = packetBytes[window:(window+structLength)]
             temp['start'] = window
             temp['end'] = window+structLength
             output.append(temp)
         except:
             None
+        id+=1
     #Filter function
     def dropTooShort(window):
         if (len(window['bytes']) == structLength):
@@ -144,6 +154,86 @@ def unpackCtypeBytes(window, formatString):
         None
     return output 
 
+def scanAdjacent(scanDirection, subWindow, packetBytes):
+    
+    if(scanDirection == '>'):
+        #packetBytes = packetBytes[subWindow['end']:]
+        for targetType in python2CTypes.keys():
+            ctypes = python2CTypes[targetType]
+            #Try each ctype for python type int
+            for ctype in ctypes:
+                if(ctype['ctype'] == 'char[]'):
+                    window = packetBytes[subWindow['end']:subWindow['end']+1]
+                    window2CType = unpackCtypeInteger(window, ctype['pythonFormat'])
+                    if(window2CType != None):
+                        print('CTYPE:')
+                        print(ctype)
+                        print('WINDOW:')
+                        print(window)
+                        print('UNPACKED VALUE:')
+                        print(window2CType[0])
+
+                        startUnpacked = str(bytes(packetBytes[:subWindow['end']]))[2:-1]
+                        midUnpacked = str(window2CType[0])
+                        endUnpacked = str(bytes(packetBytes[subWindow['end']+1:]))[2:-1]
+                        unpacked = startUnpacked + midUnpacked + endUnpacked
+                        colordiff.packetdiff(str(bytes(packetBytes))[2:-1], unpacked)  
+                else:
+                    window = packetBytes[subWindow['end']:subWindow['end']+ctype['length']]
+                    window2CType = unpackCtypeInteger(window, ctype['pythonFormat'])
+                    if(window2CType != None):
+                        print('CTYPE:')
+                        print(ctype)
+                        print('WINDOW:')
+                        print(window)
+                        print('UNPACKED VALUE:')
+                        print(window2CType[0])
+
+                        startUnpacked = str(bytes(packetBytes[:subWindow['end']]))[2:-1]
+                        midUnpacked = str(window2CType[0])
+                        endUnpacked = str(bytes(packetBytes[subWindow['end']+ctype['length']:]))[2:-1]
+                        unpacked = startUnpacked + midUnpacked + endUnpacked
+                        colordiff.packetdiff(str(bytes(packetBytes))[2:-1], unpacked)
+    #Scan left <
+    else:
+        #packetBytes = packetBytes[:subWindow['start']]
+        for targetType in python2CTypes.keys():
+            ctypes = python2CTypes[targetType]
+            #Try each ctype for python type int
+            for ctype in ctypes:
+                if(ctype['ctype'] == 'char[]'):
+                    window = packetBytes[subWindow['start']-1:subWindow['start']]
+                    window2CType = unpackCtypeInteger(window, ctype['pythonFormat'])
+                    if(window2CType != None):
+                        print('CTYPE:')
+                        print(ctype)
+                        print('WINDOW:')
+                        print(window)
+                        print('UNPACKED VALUE:')
+                        print(window2CType[0])
+
+                        startUnpacked = str(bytes(packetBytes[:subWindow['end']]))[2:-1]
+                        midUnpacked = str(window2CType[0])
+                        endUnpacked = str(bytes(packetBytes[subWindow['end']+1:]))[2:-1]
+                        unpacked = startUnpacked + midUnpacked + endUnpacked
+                        colordiff.packetdiff(str(bytes(packetBytes))[2:-1], unpacked)  
+                else:
+                    window = packetBytes[subWindow['start']:subWindow['start']-ctype['length']]
+                    window2CType = unpackCtypeInteger(window, ctype['pythonFormat'])
+                    if(window2CType != None):
+                        print('CTYPE:')
+                        print(ctype)
+                        print('WINDOW:')
+                        print(window)
+                        print('UNPACKED VALUE:')
+                        print(window2CType[0])
+
+                        startUnpacked = str(bytes(packetBytes[:subWindow['start']-ctype['length']]))[2:-1]
+                        midUnpacked = str(window2CType[0])
+                        endUnpacked = str(bytes(packetBytes[subWindow['start']:]))[2:-1]
+                        unpacked = startUnpacked + midUnpacked + endUnpacked
+                        colordiff.packetdiff(str(bytes(packetBytes))[2:-1], unpacked)
+
 
 
 
@@ -180,7 +270,7 @@ def main():
                 if(window2CType != None):
                     #print(window2CType)
                     if(args.oint in window2CType):
-                        print('FOUND OINT ORACLE: ' + str(args.oint))
+                        print(Fore.YELLOW + 'FOUND OINT ORACLE: ' + str(args.oint) + Fore.RESET)
                         print('CTYPE:')
                         print(ctype)
                         print('WINDOW:')
@@ -193,6 +283,11 @@ def main():
                         endUnpacked = str(bytes(packetBytes[window['end']:]))[2:-1]
                         unpacked = startUnpacked + midUnpacked + endUnpacked
                         colordiff.packetdiff(str(packet)[2:-1], unpacked)
+
+                        selectedWindow = input('Select Window? [y/n]: ')
+                        if(selectedWindow == 'y'):
+                            scanDirection = input('Scan Direction? [</>]: ')
+                            scanAdjacent(scanDirection, window, packetBytes)
     
     #Handle --obytes
     if(args.obytes is not None):
@@ -207,7 +302,7 @@ def main():
                     if(window2CType != None):
                         #print(window2CType)
                         if(bytes(args.obytes, encoding=args.oencoding) in window2CType):
-                            print('FOUND OBYTES ORACLE: ' + str(args.obytes))
+                            print(fore.YELLOW + 'FOUND OBYTES ORACLE: ' + str(args.obytes) + Fore.RESET)
                             print('CTYPE:')
                             print(ctype)
                             print('WINDOW:')
@@ -220,6 +315,11 @@ def main():
                             endUnpacked = str(bytes(packetBytes[window['end']:]))[2:-1]
                             unpacked = startUnpacked + midUnpacked + endUnpacked
                             colordiff.packetdiff(str(packet)[2:-1], unpacked)
+
+                            selectedWindow = input('Select Window? [y/n]: ')
+                            if(selectedWindow == 'y'):
+                                scanDirection = input('Scan Direction? [</>]: ')
+                                scanAdjacent(scanDirection, window, packetBytes)
         else:
             print("WARN: --obytes must be paired with --oencoding")
     
